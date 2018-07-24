@@ -1,0 +1,22 @@
+{
+  "name": "smartunfit-halogen",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output"
+  ],
+  "dependencies": {
+    "purescript-prelude": "^4.1.0",
+    "purescript-console": "^4.1.0",
+    "purescript-effect": "^2.0.0",
+    "purescript-spork": "^1.0.0",
+    "purescript-generics-rep": "^6.0.0",
+    "purescript-routing": "^8.0.0",
+    "purescript-simple-json": "^4.1.0",
+    "purescript-css": "^4.0.0"
+  },
+  "devDependencies": {
+    "purescript-psci-support": "^4.0.0"
+  }
+}
