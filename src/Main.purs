@@ -4,7 +4,7 @@ import Prelude
 
 import App.Styles (styleSheet)
 import App.Utils (groupBy, padLeft, seriesSeqToLabel)
-import Data.Array (foldl, length, range, snoc, zip, (!!))
+import Data.Array (foldl, length, nubEq, range, snoc, zip, (!!))
 import Data.Const (Const)
 import Data.Either (Either)
 import Data.Foldable (oneOf)
@@ -19,7 +19,7 @@ import Effect (Effect)
 import Routing (match)
 import Routing.Hash (hashes)
 import Routing.Match (Match, end, int, lit, root)
-import SmartUnfit.Exercises (EquipmentAdjustment(..), Exercise, ExerciseDetails(..), ExerciseTechnique(..), MuscleGroup(..), Series)
+import SmartUnfit.Exercises (EquipmentAdjustment(..), Exercise, ExerciseDetails(..), ExerciseTechnique(..), MuscleGroup(..), RepetitionStyle(..), Series, TimeInSeconds(..), extractWeights)
 import SmartUnfit.Regimen (Regimen, currentRegimen)
 import Spork.App as App
 import Spork.Html as H
@@ -182,13 +182,14 @@ exerciseSummaryView ex =
           snoc acc (s <> " (" <> d <> ")")
     important =
       case ex.details of
-        (WeightTrainingExercise e) -> (show e.weight) <> "kg"
+        (WeightTrainingExercise _) ->
+          S.joinWith "|" $
+            map (\w -> show w) (nubEq $ extractWeights ex.technique)
         (AerobicExercise e) -> (show e.timeInMinutes) <> "'"
         (BodyWeightExercise e) ->
           case ex.technique of
             (TimeHoldingPosture t) -> (show t) <> "\""
-            (Repetitions i) -> show i
-            (RepetitionRange s f) -> show s <> "-" <> show f
+            (RepetitionSequence seq) -> show seq
             _ -> ""
 
     muscleGroupClassName =
@@ -251,19 +252,26 @@ exerciseExtraInfoView exercise =
     details =
       case exercise.details of
         (WeightTrainingExercise wte) ->
-          "Séries: " <> show wte.repeatTimes
+          "Séries: " <> show wte.seriesCount
         otherwise -> ""
 
     technique =
       case exercise.technique of
-        (Repetitions n) ->
-          "Repetições: " <> show n
-        (RepetitionRange f t) ->
-          "Repetições: " <> show f <> "-" <> show t
+        (RepetitionSequence seq) ->
+          "Repetições: " <> S.joinWith " | " (repSequence seq)
         StayAtIt ->
           ""
         (TimeHoldingPosture n) ->
           "Segurar por " <> show n <> "\""
+
+    repSequence =
+      map describeRep
+      where
+        describeRep (Repetitions _ i) = show i
+        describeRep (UnilateralRepetitions _ i) = show i
+        describeRep (RepetitionRange _ a b) = show a <> "-" <> show b
+        describeRep (MaxRepetitions _) = "Máximo"
+        describeRep (HoldPosture _ (TimeInSeconds t)) = "Segurar " <> show t <> "\""
 
 missingExerciseDetailsView :: H.Html Action
 missingExerciseDetailsView =

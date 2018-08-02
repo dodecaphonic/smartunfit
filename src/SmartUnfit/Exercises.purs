@@ -6,19 +6,25 @@ module SmartUnfit.Exercises
        , EquipmentId
        , EquipmentAdjustment(..)
        , MuscleGroup(..)
+       , RepetitionStyle(..)
        , Series
        , TrainingSession
+       , TimeInSeconds(..)
+       , Weight(..)
        , defaultExercises
+       , extractWeights
        ) where
 
 import Data.Maybe
 
 import Data.Bounded (class Ord)
 import Data.DateTime (DateTime)
+import Data.Eq (class Eq)
+import Data.Functor (map)
 import Data.Generic.Rep as G
 import Data.Generic.Rep.Show as GShow
-import Data.Eq (class Eq)
-import Data.Show (class Show)
+import Data.Semigroup ((<>))
+import Data.Show (class Show, show)
 
 type EquipmentId = Int
 
@@ -50,29 +56,49 @@ derive instance genericEquipmentAdjustment :: G.Generic EquipmentAdjustment _
 instance showEquipmentAdjustment :: Show EquipmentAdjustment where
   show = GShow.genericShow
 
+newtype TimeInSeconds = TimeInSeconds Int
+data Weight =
+    Weight Number
+  | BodyWeight
+
+derive instance eqWeight :: Eq Weight
+
+data RepetitionStyle =
+     Repetitions Weight Int
+   | UnilateralRepetitions Weight Int
+   | RepetitionRange Weight Int Int
+   | MaxRepetitions Weight
+   | HoldPosture Weight TimeInSeconds
+
 data ExerciseTechnique =
-    Repetitions Int
-  | RepetitionRange Int Int
+    RepetitionSequence (Array RepetitionStyle)
   | StayAtIt
-  | TimeHoldingPosture Int
+  | TimeHoldingPosture TimeInSeconds
 
 derive instance eqExerciseTechnique :: Eq ExerciseTechnique
+derive instance eqRepetitionStyle :: Eq RepetitionStyle
+derive instance eqTimeInSeconds :: Eq TimeInSeconds
+
 derive instance genericExerciseTechnique :: G.Generic ExerciseTechnique _
+derive instance genericRepetitionStyle :: G.Generic RepetitionStyle _
+
+instance showTimeInseconds :: Show TimeInSeconds where
+  show (TimeInSeconds t) = show t <> "\""
 
 instance showExerciseTechnique :: Show ExerciseTechnique where
   show = GShow.genericShow
 
+instance showRepetitionStyle :: Show RepetitionStyle where
+  show v = GShow.genericShow v
+
 data ExerciseDetails =
   WeightTrainingExercise
-  { equipmentId :: Maybe EquipmentId
-  , equipmentAdjustments :: Array EquipmentAdjustment
-  , weight :: Number
-  , repeatTimes :: Int
-  }
-  | BodyWeightExercise
-    { place :: String
-    , repeatTimes :: Int
+    { equipmentId :: Maybe EquipmentId
+    , equipmentAdjustments :: Array EquipmentAdjustment
+    , seriesCount :: Int
     }
+  | BodyWeightExercise
+    { place :: String }
   | AerobicExercise
     { timeInMinutes :: Int }
 
@@ -98,6 +124,10 @@ instance showExerciseDetails :: Show ExerciseDetails where
 instance showExerciseCompletion :: Show ExerciseCompletion where
   show = GShow.genericShow
 
+instance showWeight :: Show Weight where
+  show (Weight w) = show w <> "kg"
+  show BodyWeight = ""
+
 type TrainingSession =
   { series :: Series
   , startedAt :: DateTime
@@ -115,15 +145,14 @@ mkWeightTrainingExercise muscleGroup equipmentId description =
       WeightTrainingExercise
       { equipmentId
       , equipmentAdjustments: []
-      , repeatTimes: 1
-      , weight: 5.0
+      , seriesCount: 3
       }
   in
     { muscleGroup
     , description
     , details
     , notes: Nothing
-    , technique: Repetitions 1
+    , technique: RepetitionSequence [ Repetitions (Weight 5.0) 1 ]
     }
 
 defaultExercises :: Array Exercise
@@ -180,3 +209,15 @@ defaultExercises =
   , mkWeightTrainingExercise AbdomenLumbar (Just 43) "Lombar Máquina"
   , mkWeightTrainingExercise AbdomenLumbar (Just 44) "Hiperextensão Lombar"
   ]
+
+extractWeights :: ExerciseTechnique -> Array Weight
+extractWeights (RepetitionSequence seq) =
+  map extractWeight seq
+  where
+    extractWeight (Repetitions w _) = w
+    extractWeight (UnilateralRepetitions w _) = w
+    extractWeight (RepetitionRange w _ _) = w
+    extractWeight (MaxRepetitions w) = w
+    extractWeight (HoldPosture w _) = w
+
+extractWeights _ = []
