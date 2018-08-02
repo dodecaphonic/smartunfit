@@ -5,13 +5,20 @@ import Prelude
 import App.Styles (styleSheet)
 import Data.Array (foldl, length, range, snoc, zip, (!!))
 import Data.Const (Const)
-import Data.Foldable (class Foldable)
+import Data.Either (Either)
+import Data.Foldable (class Foldable, oneOf)
+import Data.Foldable as F
+import Data.Generic.Rep as G
+import Data.Generic.Rep.Show as GShow
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as S
 import Data.Tuple (Tuple(..), uncurry)
 import Effect (Effect)
+import Routing (match)
+import Routing.Hash (hashes)
+import Routing.Match (Match, end, int, lit, root)
 import SmartUnfit.Exercises (EquipmentAdjustment(..), Exercise, ExerciseDetails(..), ExerciseTechnique(..), MuscleGroup(..), Series)
 import SmartUnfit.Regimen (Regimen, currentRegimen)
 import Spork.App as App
@@ -25,9 +32,15 @@ import Web.HTML (window)
 import Web.HTML.HTMLDocument (toDocument)
 import Web.HTML.Window (document)
 
-data Action =
-    SelectSeries Int
+data Action
+  = ShowSeriesSelector
+  | SelectSeries Int
   | SelectExercise Int Int
+
+derive instance genericAction :: G.Generic Action _
+
+instance showAction :: Show Action where
+  show = GShow.genericShow
 
 data SmartUnfitEffect a =
   LoadFromStorage a
@@ -76,6 +89,22 @@ seriesSeqToLabel i =
   let rest = i `mod` 8
   in seriesSeqToLabel rest <> show (i `div` 8)
 
+route :: Match Action
+route =
+  oneOf
+    [ ShowSeriesSelector <$ end
+    , root *> (SelectSeries <$> (lit "series" *> int) <* end)
+    , root *>
+        (SelectExercise <$>
+          (lit "series" *> int) <*>
+          (lit "exercises" *> int) <*
+          end
+        )
+    ]
+
+routeAction :: String -> Either String Action
+routeAction = match route
+
 init :: Model
 init =
   Model
@@ -91,6 +120,11 @@ runSmartUnfitEffect = case _ of
 
 update :: Model -> Action -> App.Transition SmartUnfitEffect Model Action
 update (Model model) = case _ of
+  ShowSeriesSelector ->
+    App.purely $
+      Model $
+      model { selectedExercise = Nothing, selectedSeries = Nothing}
+
   SelectSeries idx ->
     App.purely $ Model $ model { selectedSeries = Just idx }
 
@@ -102,9 +136,9 @@ update (Model model) = case _ of
 
 seriesSelectorView :: Int -> H.Html Action
 seriesSelectorView i =
-  H.div
+  H.a
     [ H.classes [ "series-selection" ]
-    , H.onClick (H.always_ $ SelectSeries i)
+    , H.href ("/#/series/" <> show i)
     ]
     [ H.text $ seriesSeqToLabel i ]
 
@@ -212,8 +246,10 @@ exerciseSummaryView ex =
 
 exerciseListItemView :: Int -> Int -> Exercise -> H.Html Action
 exerciseListItemView seriesIdx exerciseIdx ex =
-  H.div
-    [ H.onClick (H.always_ $ SelectExercise seriesIdx exerciseIdx) ]
+  H.a
+    [ H.href ("/#/series/" <> show seriesIdx <> "/exercises/" <> show exerciseIdx)
+    , H.classes ["exercise-list-item"]
+    ]
     [ exerciseSummaryView ex ]
 
 
@@ -314,8 +350,15 @@ main :: Effect Unit
 main = do
   addStylesheet
 
-  void $
+  inst <-
     App.makeWithSelector
       (liftNat runSmartUnfitEffect `merge` never)
       app
       "#app"
+
+  inst.run
+
+  void $ hashes \oldHash newHash -> do
+    F.for_ (routeAction newHash) \i -> do
+      inst.push i
+      inst.run

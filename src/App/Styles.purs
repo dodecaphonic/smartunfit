@@ -2,9 +2,11 @@ module App.Styles (css, styleSheet) where
 
 import Prelude
 
-import CSS (CSS, Prefixed(..), Value(..), alignItems, alignSelf, backgroundColor, borderBottom, color, column, display, em, flex, flexDirection, flexStart, fontSize, fromString, height, justifyContent, key, letterSpacing, margin, marginBottom, marginLeft, marginTop, minHeight, paddingBottom, paddingTop, pct, px, renderedSheet, rgb, row, solid, value, white, width, (?))
+import CSS (CSS, Prefixed(..), Value(..), alignItems, alignSelf, backgroundColor, borderBottom, color, column, display, em, flex, flexDirection, flexStart, fontSize, fromString, height, justifyContent, key, letterSpacing, margin, marginBottom, marginLeft, marginTop, minHeight, paddingBottom, paddingTop, pct, px, renderedSheet, rgb, row, solid, textDecoration, value, white, width, (?))
+import CSS.Common (none)
 import CSS.Common as CSS
 import CSS.Render (render)
+import CSS.Text (TextDecoration(..))
 import CSS.Text.Transform (textTransform, uppercase)
 import CSS.TextAlign (TextAlign(..), center, textAlign)
 import Data.Maybe (maybe)
@@ -83,6 +85,10 @@ css = do
     width (120.0 #px)
     textAlign center
 
+  fromString ".exercise-list-item" ? do
+    color white
+    textDecoration (TextDecoration none)
+
   fromString ".exercise .equipment-id.arms" ? do
     backgroundColor armsEquipment
     color white
@@ -132,6 +138,7 @@ css = do
     display flex
     alignItems CSS.center
     justifyContent CSS.center
+    textDecoration (TextDecoration none)
 
   fromString ".series-selection:not(:first-child)" ? do
     marginTop (30.0 #px)
