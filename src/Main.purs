@@ -102,7 +102,11 @@ update (Model model) = case _ of
               , selectedSeries = Nothing}
 
   SelectSeries idx ->
-    App.purely $ Model $ model { selectedSeries = Just idx }
+    App.purely $
+      Model $
+        model { selectedSeries = Just idx
+              , selectedExercise = Nothing
+              }
 
   SelectExercise series exercise ->
     App.purely $
