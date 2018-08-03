@@ -320,7 +320,7 @@ exerciseExtraInfoView exercise =
       map describeRep
       where
         describeRep (Repetitions _ i) = show i
-        describeRep (UnilateralRepetitions _ i) = show i
+        describeRep (UnilateralRepetitions _ i) = show i <> " (Unilateral)"
         describeRep (RepetitionRange _ a b) = show a <> "-" <> show b
         describeRep (MaxRepetitions _) = "Máximo"
         describeRep (HoldPosture _ (TimeInSeconds t)) = "Segurar " <> show t <> "\""
