@@ -36,20 +36,31 @@ data Action
   = ShowSeriesSelector
   | SelectSeries Int
   | SelectExercise Int Int
+  | SwitchDisplayStyle SeriesDisplayStyle
 
+data SmartUnfitEffect a =
+  LoadFromStorage a
+
+data SeriesDisplayStyle =
+    GroupedStyle
+  | SequenceStyle
+
+derive instance eqSeriesDisplayStyle :: Eq SeriesDisplayStyle
 derive instance genericAction :: G.Generic Action _
+derive instance genericSeriesDisplayStyle :: G.Generic SeriesDisplayStyle _
 
 instance showAction :: Show Action where
   show = GShow.genericShow
 
-data SmartUnfitEffect a =
-  LoadFromStorage a
+instance showSeriesDisplayStyle :: Show SeriesDisplayStyle where
+  show = GShow.genericShow
 
 newtype Model =
   Model
     { regimen :: Regimen
     , selectedSeries :: Maybe Int
     , selectedExercise :: Maybe Int
+    , seriesDisplayStyle :: SeriesDisplayStyle
     }
 
 route :: Match Action
@@ -74,6 +85,7 @@ init =
     { regimen: currentRegimen
     , selectedSeries: Nothing
     , selectedExercise: Nothing
+    , seriesDisplayStyle: SequenceStyle
     }
 
 runSmartUnfitEffect :: SmartUnfitEffect ~> Effect
@@ -86,7 +98,8 @@ update (Model model) = case _ of
   ShowSeriesSelector ->
     App.purely $
       Model $
-      model { selectedExercise = Nothing, selectedSeries = Nothing}
+        model { selectedExercise = Nothing
+              , selectedSeries = Nothing}
 
   SelectSeries idx ->
     App.purely $ Model $ model { selectedSeries = Just idx }
@@ -96,6 +109,9 @@ update (Model model) = case _ of
       Model $
         model { selectedSeries = Just series
               , selectedExercise = Just exercise }
+
+  SwitchDisplayStyle newStyle ->
+    App.purely $ Model $ model { seriesDisplayStyle = newStyle }
 
 seriesSelectorView :: Int -> H.Html Action
 seriesSelectorView i =
@@ -114,17 +130,53 @@ selectSeriesView regimen =
 noSelectedSeriesView :: H.Html Action
 noSelectedSeriesView = H.div [] [ H.text "Fudge" ]
 
-seriesView :: Int -> Series -> H.Html Action
-seriesView seriesIdx series =
+seriesView :: SeriesDisplayStyle -> Int -> Series -> H.Html Action
+seriesView displayStyle seriesIdx series =
   H.div
     []
     ([ H.h1
        [ H.classes [ "series" ] ]
        [ H.text (seriesSeqToLabel seriesIdx) ]
-     ] <> map (uncurry $ groupView seriesIdx) grouped)
+     , seriesDisplayStyleSwitcherView displayStyle
+     ] <> seriesDisplay
+     )
+  where
+    seriesDisplay =
+      case displayStyle of
+        GroupedStyle -> groupedSeriesDisplayView seriesIdx series
+        SequenceStyle -> sequencedSeriesDisplayView seriesIdx series
+
+seriesDisplayStyleSwitcherView :: SeriesDisplayStyle -> H.Html Action
+seriesDisplayStyleSwitcherView displayStyle =
+  H.div
+    [ H.classes [ "display-style-switcher" ] ]
+    [ switcherButton GroupedStyle "Ver por Grupos"
+    , switcherButton SequenceStyle "Ver Sequência"
+    ]
+  where
+    switcherButton selectStyle label =
+      H.button
+        [ H.onClick (\_ -> Just $ SwitchDisplayStyle selectStyle)
+        , H.classes $ selectedClasses selectStyle ]
+        [ H.text label ]
+    selectedClasses newStyle =
+      if newStyle == displayStyle
+      then [ "selected" ]
+      else []
+
+groupedSeriesDisplayView :: Int -> Series -> Array (H.Html Action)
+groupedSeriesDisplayView seriesIdx series =
+  map (uncurry $ groupView seriesIdx) grouped
   where
     grouped = Map.toUnfoldable $ groupBy (\(Tuple i e) -> e.muscleGroup) indexedSeries
     indexedSeries = zip (range 0 $ length series) series
+
+sequencedSeriesDisplayView :: Int -> Series -> Array (H.Html Action)
+sequencedSeriesDisplayView seriesIdx = map summary <<< indexSeries
+  where
+    indexSeries = zip <*> (range 0 <<< length)
+    summary (Tuple e i) =
+      exerciseListItemView seriesIdx i e
 
 groupView :: Int -> MuscleGroup -> Array (Tuple Int Exercise) -> H.Html Action
 groupView seriesIdx mg tme =
@@ -287,7 +339,7 @@ render (Model model) =
         Nothing ->
           maybe
             noSelectedSeriesView
-            (seriesView series)
+            (seriesView model.seriesDisplayStyle series)
             (model.regimen !! series)
     Nothing ->
       selectSeriesView model.regimen

@@ -2,14 +2,15 @@ module App.Styles (css, styleSheet) where
 
 import Prelude
 
-import CSS (CSS, Prefixed(..), Value(..), alignItems, alignSelf, backgroundColor, borderBottom, color, column, display, em, flex, flexDirection, flexStart, fontSize, fromString, height, justifyContent, key, letterSpacing, margin, marginBottom, marginLeft, marginTop, minHeight, paddingBottom, paddingTop, pct, px, renderedSheet, rgb, row, solid, textDecoration, value, white, width, (?))
+import CSS (CSS, Prefixed(..), Value(..), aliceblue, alignItems, alignSelf, backgroundColor, border, borderBottom, borderRadius, color, column, display, em, flex, flexDirection, flexStart, fontSize, fromString, height, justifyContent, key, letterSpacing, margin, marginBottom, marginLeft, marginTop, minHeight, padding, paddingBottom, paddingTop, pct, px, renderedSheet, rgb, row, solid, textDecoration, value, white, width, (?))
+import CSS.Color (fromHexString)
 import CSS.Common (none)
 import CSS.Common as CSS
 import CSS.Render (render)
 import CSS.Text (TextDecoration(..))
 import CSS.Text.Transform (textTransform, uppercase)
 import CSS.TextAlign (TextAlign(..), center, textAlign)
-import Data.Maybe (maybe)
+import Data.Maybe (fromMaybe, maybe)
 
 css :: CSS
 css = do
@@ -142,6 +143,27 @@ css = do
 
   fromString ".series-selection:not(:first-child)" ? do
     marginTop (30.0 #px)
+
+  fromString ".display-style-switcher" ? do
+    padding (5.0 #px) (5.0 #px) (5.0 #px) (5.0 #px)
+    backgroundColor (fromMaybe orange $ fromHexString "#71767a")
+    display flex
+    justifyContent CSS.center
+
+    fromString "button" ? do
+      height (40.0 #px)
+      borderRadius (5.0 #px) (5.0 #px) (5.0 #px) (5.0 #px)
+      margin (5.0 #px) (5.0 #px) (5.0 #px) (5.0 #px)
+      padding (5.0 #px) (5.0 #px) (5.0 #px) (5.0 #px)
+      backgroundColor darkGrey
+      color white
+      fontSize (1.0 #em)
+      border solid (1.0 #px) darkGrey
+
+    fromString "button.selected" ? do
+      let bgColor = fromMaybe aliceblue $ fromHexString "#314f89"
+      backgroundColor bgColor
+      border solid (1.0 #px) bgColor
 
 styleSheet :: String
 styleSheet =
