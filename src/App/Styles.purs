@@ -6,6 +6,7 @@ import CSS (CSS, Prefixed(..), Value(..), aliceblue, alignItems, alignSelf, back
 import CSS.Color (fromHexString)
 import CSS.Common (none)
 import CSS.Common as CSS
+import CSS.Flexbox as Flexbox
 import CSS.Render (render)
 import CSS.Text (TextDecoration(..))
 import CSS.Text.Transform (textTransform, uppercase)
@@ -83,7 +84,7 @@ css = do
     fontSize (2.0 #em)
     alignSelf flexStart
     color orange
-    width (120.0 #px)
+    Flexbox.flex 0 0 (90.0 #px)
     textAlign center
 
   fromString ".exercise-list-item" ? do
