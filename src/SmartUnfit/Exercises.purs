@@ -15,16 +15,19 @@ module SmartUnfit.Exercises
        , extractWeights
        ) where
 
-import Data.Maybe
+import Prelude
 
-import Data.Bounded (class Ord)
+import Control.Alternative ((<|>))
+import Control.Monad.Except (throwError)
 import Data.DateTime (DateTime)
-import Data.Eq (class Eq)
-import Data.Functor (map)
 import Data.Generic.Rep as G
 import Data.Generic.Rep.Show as GShow
-import Data.Semigroup ((<>))
-import Data.Show (class Show, show)
+import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype, unwrap)
+import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Foreign (Foreign)
+import Foreign as Foreign
+import Simple.JSON as JSON
 
 type EquipmentId = Int
 
@@ -47,8 +50,8 @@ instance showMuscleGroup :: Show MuscleGroup where
    show = GShow.genericShow
 
 data EquipmentAdjustment =
-    NumericAdjustment Int String
-  | DescriptiveAdjustment String String
+    NumericAdjustment { adjustment :: Int, description :: String}
+  | DescriptiveAdjustment { adjustment :: String, description :: String}
 
 derive instance eqEquipmentAdjustment :: Eq EquipmentAdjustment
 derive instance genericEquipmentAdjustment :: G.Generic EquipmentAdjustment _
@@ -61,14 +64,15 @@ data Weight =
     Weight Number
   | BodyWeight
 
+derive instance genericWeight :: G.Generic Weight _
 derive instance eqWeight :: Eq Weight
 
 data RepetitionStyle =
-     Repetitions Weight Int
-   | UnilateralRepetitions Weight Int
-   | RepetitionRange Weight Int Int
-   | MaxRepetitions Weight
-   | HoldPosture Weight TimeInSeconds
+     Repetitions { weight :: Weight, count :: Int }
+   | UnilateralRepetitions { weight :: Weight, count :: Int }
+   | RepetitionRange { weight :: Weight, minimum :: Int, maximum :: Int}
+   | MaxRepetitions { weight :: Weight }
+   | HoldPosture { weight :: Weight, howLong :: TimeInSeconds}
 
 data ExerciseTechnique =
     RepetitionSequence (Array RepetitionStyle)
@@ -78,6 +82,7 @@ data ExerciseTechnique =
 derive instance eqExerciseTechnique :: Eq ExerciseTechnique
 derive instance eqRepetitionStyle :: Eq RepetitionStyle
 derive instance eqTimeInSeconds :: Eq TimeInSeconds
+derive instance newtypeTimeInSeconds :: Newtype TimeInSeconds _
 
 derive instance genericExerciseTechnique :: G.Generic ExerciseTechnique _
 derive instance genericRepetitionStyle :: G.Generic RepetitionStyle _
@@ -97,10 +102,8 @@ data ExerciseDetails =
     , equipmentAdjustments :: Array EquipmentAdjustment
     , seriesCount :: Int
     }
-  | BodyWeightExercise
-    { place :: String }
-  | AerobicExercise
-    { timeInMinutes :: Int }
+  | BodyWeightExercise { place :: String }
+  | AerobicExercise { timeInMinutes :: Int }
 
 type Exercise =
   { description :: String
@@ -135,6 +138,151 @@ type TrainingSession =
   , exerciseCompletionLog :: Array ExerciseCompletion
   }
 
+-- JSON
+
+class EnumReadForeign rep where
+  enumReadForeignImpl :: Foreign -> Foreign.F rep
+
+instance sumEnumReadForeign ::
+  ( EnumReadForeign a
+  , EnumReadForeign b
+  ) => EnumReadForeign (G.Sum a b) where
+  enumReadForeignImpl f
+      = G.Inl <$> enumReadForeignImpl f
+    <|> G.Inr <$> enumReadForeignImpl f
+
+instance constructorArgsEnumReadForeign ::
+  ( IsSymbol name
+  , EnumReadForeign a
+  ) => EnumReadForeign (G.Constructor name a) where
+  enumReadForeignImpl f = do
+    record :: { tag :: String, value :: Foreign } <- JSON.readImpl f
+
+    if record.tag == name
+      then G.Constructor <$> enumReadForeignImpl record.value
+      else throwError <<< pure <<< Foreign.ForeignError $
+        "Enum string " <> record.tag <> " did not match expected string " <> name
+    where
+      name = reflectSymbol (SProxy :: SProxy name)
+
+instance argumentEnumReadForeign ::
+  ( JSON.ReadForeign a
+  ) => EnumReadForeign (G.Argument a) where
+  enumReadForeignImpl f = G.Argument <$> JSON.readImpl f
+
+instance noArgumentEnumReadForeign :: EnumReadForeign G.NoArguments where
+  enumReadForeignImpl f = pure G.NoArguments
+
+instance writeForeignRepetitionStyle ::
+  JSON.WriteForeign RepetitionStyle where
+  writeImpl (Repetitions value)
+    = JSON.writeImpl { tag: "Repetitions"
+                     , value
+                     }
+
+  writeImpl (UnilateralRepetitions value)
+    = JSON.writeImpl { tag: "UnilateralRepetitions"
+                     , value
+                     }
+
+  writeImpl (RepetitionRange value)
+    = JSON.writeImpl { tag: "RepetitionRange"
+                     , value
+                     }
+
+  writeImpl (MaxRepetitions value)
+    = JSON.writeImpl { tag: "MaxRepetitions"
+                     , value
+                     }
+
+  writeImpl (HoldPosture value)
+    = JSON.writeImpl { tag: "HoldPosture"
+                     , value
+                     }
+
+instance writeTimeInSeconds :: JSON.WriteForeign TimeInSeconds where
+  writeImpl = JSON.writeImpl <<< unwrap
+
+instance readTimeInSeconds :: JSON.ReadForeign TimeInSeconds where
+  readImpl f = TimeInSeconds <$> Foreign.readInt f
+
+instance writeForeignExerciseDetails :: JSON.WriteForeign ExerciseDetails where
+  writeImpl (WeightTrainingExercise value)
+    = JSON.writeImpl { tag: "WeightTrainingExercise", value }
+  writeImpl (BodyWeightExercise value)
+    = JSON.writeImpl { tag: "BodyWeightExercise", value }
+  writeImpl (AerobicExercise value)
+    = JSON.writeImpl { tag: "AerobicExercise", value }
+
+instance readForeignEquipmentAdjustment :: JSON.ReadForeign EquipmentAdjustment where
+  readImpl = enumReadForeign
+
+instance readForeignExerciseDetails :: JSON.ReadForeign ExerciseDetails where
+  readImpl = enumReadForeign
+
+instance readRepetitionStyle :: JSON.ReadForeign RepetitionStyle where
+  readImpl = enumReadForeign
+
+instance readExerciseTechnique :: JSON.ReadForeign ExerciseTechnique where
+  readImpl = enumReadForeign
+
+instance writeForeignExerciseTechnique
+         :: JSON.WriteForeign ExerciseTechnique where
+
+  writeImpl (RepetitionSequence value)
+    = JSON.writeImpl { tag: "RepetitionSequence"
+                     , value
+                     }
+
+  writeImpl StayAtIt
+    = JSON.writeImpl { tag: "StayAtIt" }
+
+  writeImpl (TimeHoldingPosture value)
+    = JSON.writeImpl { tag: "TimeHoldingPosture"
+                     , value
+                     }
+
+instance writeForeignWeight :: JSON.WriteForeign Weight where
+  writeImpl (Weight weight)
+    = JSON.writeImpl { tag: "Weight"
+                     , value: weight
+                     }
+
+  writeImpl BodyWeight
+    = JSON.writeImpl { tag: "BodyWeight" }
+
+instance readForeignWeight :: JSON.ReadForeign Weight where
+  readImpl = enumReadForeign
+
+instance writeForeignEquipmentAdjustment ::
+  JSON.WriteForeign EquipmentAdjustment where
+
+  writeImpl (NumericAdjustment value)
+    = JSON.writeImpl { tag: "NumericAdjustment"
+                     , value
+                     }
+
+  writeImpl (DescriptiveAdjustment value)
+    = JSON.writeImpl { tag: "DescriptiveAdjustment"
+                     , value
+                     }
+
+instance writeForeignMuscleGroup :: JSON.WriteForeign MuscleGroup where
+  writeImpl mg = JSON.writeImpl { tag: show mg }
+
+instance readForeignMuscleGroup :: JSON.ReadForeign MuscleGroup where
+  readImpl = enumReadForeign
+
+enumReadForeign
+  :: forall a rep
+   . G.Generic a rep
+  => EnumReadForeign rep
+  => Foreign
+  -> Foreign.F a
+enumReadForeign f = G.to <$> enumReadForeignImpl f
+
+-- HELPERS
+
 mkWeightTrainingExercise :: MuscleGroup
                          -> Maybe EquipmentId
                          -> String
@@ -152,7 +300,7 @@ mkWeightTrainingExercise muscleGroup equipmentId description =
     , description
     , details
     , notes: Nothing
-    , technique: RepetitionSequence [ Repetitions (Weight 5.0) 1 ]
+    , technique: RepetitionSequence [ Repetitions { weight: Weight 5.0, count: 1 } ]
     }
 
 defaultExercises :: Array Exercise
@@ -214,10 +362,10 @@ extractWeights :: ExerciseTechnique -> Array Weight
 extractWeights (RepetitionSequence seq) =
   map extractWeight seq
   where
-    extractWeight (Repetitions w _) = w
-    extractWeight (UnilateralRepetitions w _) = w
-    extractWeight (RepetitionRange w _ _) = w
-    extractWeight (MaxRepetitions w) = w
-    extractWeight (HoldPosture w _) = w
+    extractWeight (Repetitions { weight }) = weight
+    extractWeight (UnilateralRepetitions { weight }) = weight
+    extractWeight (RepetitionRange { weight }) = weight
+    extractWeight (MaxRepetitions { weight }) = weight
+    extractWeight (HoldPosture { weight }) = weight
 
 extractWeights _ = []

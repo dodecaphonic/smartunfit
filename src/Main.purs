@@ -6,7 +6,7 @@ import App.Styles (styleSheet)
 import App.Utils (groupBy, padLeft, seriesSeqToLabel)
 import Data.Array (foldl, length, nubEq, range, snoc, zip, (!!))
 import Data.Const (Const)
-import Data.Either (Either)
+import Data.Either (Either, hush)
 import Data.Foldable (oneOf)
 import Data.Foldable as F
 import Data.Generic.Rep as G
@@ -19,8 +19,9 @@ import Effect (Effect)
 import Routing (match)
 import Routing.Hash (hashes)
 import Routing.Match (Match, end, int, lit, root)
-import SmartUnfit.Exercises (EquipmentAdjustment(..), Exercise, ExerciseDetails(..), ExerciseTechnique(..), MuscleGroup(..), RepetitionStyle(..), Series, TimeInSeconds(..), extractWeights)
-import SmartUnfit.Regimen (Regimen, currentRegimen)
+import Simple.JSON as JSON
+import SmartUnfit.Exercises (EquipmentAdjustment(..), Exercise, ExerciseDetails(..), ExerciseTechnique(..), MuscleGroup(..), RepetitionStyle(..), Series, extractWeights)
+import SmartUnfit.Regimen as Regimen
 import Spork.App as App
 import Spork.Html as H
 import Spork.Interpreter (liftNat, merge, never)
@@ -30,7 +31,8 @@ import Web.DOM.Node (appendChild, setTextContent)
 import Web.DOM.ParentNode (QuerySelector(..), querySelector)
 import Web.HTML (window)
 import Web.HTML.HTMLDocument (toDocument)
-import Web.HTML.Window (document)
+import Web.HTML.Window (document, localStorage)
+import Web.Storage.Storage as Storage
 
 data Action
   = ShowSeriesSelector
@@ -38,8 +40,8 @@ data Action
   | SelectExercise Int Int
   | SwitchDisplayStyle SeriesDisplayStyle
 
-data SmartUnfitEffect a =
-  LoadFromStorage a
+data SmartUnfitEffect a
+  = WriteToStorage a
 
 data SeriesDisplayStyle =
     GroupedStyle
@@ -55,9 +57,8 @@ instance showAction :: Show Action where
 instance showSeriesDisplayStyle :: Show SeriesDisplayStyle where
   show = GShow.genericShow
 
-newtype Model =
-  Model
-    { regimen :: Regimen
+type Model =
+    { regimen :: Regimen.Regimen
     , selectedSeries :: Maybe Int
     , selectedExercise :: Maybe Int
     , seriesDisplayStyle :: SeriesDisplayStyle
@@ -81,8 +82,7 @@ routeAction = match route
 
 init :: Model
 init =
-  Model
-    { regimen: currentRegimen
+    { regimen: Regimen.currentRegimen
     , selectedSeries: Nothing
     , selectedExercise: Nothing
     , seriesDisplayStyle: SequenceStyle
@@ -90,32 +90,29 @@ init =
 
 runSmartUnfitEffect :: SmartUnfitEffect ~> Effect
 runSmartUnfitEffect = case _ of
-  LoadFromStorage next ->
+  WriteToStorage next ->
     pure next
 
 update :: Model -> Action -> App.Transition SmartUnfitEffect Model Action
-update (Model model) = case _ of
+update model = case _ of
   ShowSeriesSelector ->
     App.purely $
-      Model $
         model { selectedExercise = Nothing
               , selectedSeries = Nothing}
 
   SelectSeries idx ->
     App.purely $
-      Model $
         model { selectedSeries = Just idx
               , selectedExercise = Nothing
               }
 
   SelectExercise series exercise ->
     App.purely $
-      Model $
         model { selectedSeries = Just series
               , selectedExercise = Just exercise }
 
   SwitchDisplayStyle newStyle ->
-    App.purely $ Model $ model { seriesDisplayStyle = newStyle }
+    App.purely $ model { seriesDisplayStyle = newStyle }
 
 seriesSelectorView :: Int -> H.Html Action
 seriesSelectorView i =
@@ -125,7 +122,7 @@ seriesSelectorView i =
     ]
     [ H.text $ seriesSeqToLabel i ]
 
-selectSeriesView :: Regimen -> H.Html Action
+selectSeriesView :: Regimen.Regimen -> H.Html Action
 selectSeriesView regimen =
   H.div
     [ H.classes [ "series-selector" ] ]
@@ -232,10 +229,10 @@ exerciseSummaryView ex =
           S.joinWith "/" $ foldl addAdjustment [] d.equipmentAdjustments
         _ -> ""
       where
-        addAdjustment acc (NumericAdjustment i s) =
-          snoc acc $ (show i) <> " (" <> s <> ")"
-        addAdjustment acc (DescriptiveAdjustment s d) =
-          snoc acc (s <> " (" <> d <> ")")
+        addAdjustment acc (NumericAdjustment { adjustment, description }) =
+          snoc acc $ (show adjustment) <> " (" <> description <> ")"
+        addAdjustment acc (DescriptiveAdjustment { adjustment, description }) =
+          snoc acc (adjustment <> " (" <> description <> ")")
     important =
       case ex.details of
         (WeightTrainingExercise _) ->
@@ -273,7 +270,7 @@ exerciseListItemView seriesIdx exerciseIdx ex =
     [ exerciseSummaryView ex ]
 
 
-exerciseView :: Regimen -> Int -> Int -> H.Html Action
+exerciseView :: Regimen.Regimen -> Int -> Int -> H.Html Action
 exerciseView regimen seriesIdx exerciseIdx =
   H.div
     []
@@ -323,18 +320,18 @@ exerciseExtraInfoView exercise =
     repSequence =
       map describeRep
       where
-        describeRep (Repetitions _ i) = show i
-        describeRep (UnilateralRepetitions _ i) = show i <> " (Unilateral)"
-        describeRep (RepetitionRange _ a b) = show a <> "-" <> show b
+        describeRep (Repetitions { count }) = show count
+        describeRep (UnilateralRepetitions { count }) = show count <> " (Unilateral)"
+        describeRep (RepetitionRange { minimum, maximum }) = show minimum <> "-" <> show maximum
         describeRep (MaxRepetitions _) = "Máximo"
-        describeRep (HoldPosture _ (TimeInSeconds t)) = "Segurar " <> show t <> "\""
+        describeRep (HoldPosture { howLong }) = "Segurar " <> show howLong <> "\""
 
 missingExerciseDetailsView :: H.Html Action
 missingExerciseDetailsView =
   H.div [] [ H.text "Ops! Exercício faltando." ]
 
 render :: Model -> H.Html Action
-render (Model model) =
+render model =
   case model.selectedSeries of
     Just series ->
       case model.selectedExercise of
@@ -348,13 +345,17 @@ render (Model model) =
     Nothing ->
       selectSeriesView model.regimen
 
-app :: App.App SmartUnfitEffect (Const Void) Model Action
-app =
+app :: Maybe Regimen.Regimen -> App.App SmartUnfitEffect (Const Void) Model Action
+app currentRegimen =
   { update
   , render
-  , init: App.purely init
+  , init: App.purely regimen
   , subs: const mempty
   }
+  where
+    regimen = case currentRegimen of
+      Just reg -> init { regimen = reg }
+      Nothing -> init
 
 addStylesheet :: Effect Unit
 addStylesheet = do
@@ -377,10 +378,16 @@ main :: Effect Unit
 main = do
   addStylesheet
 
+  storedRegimen <-
+    window
+      >>= localStorage
+      >>= Storage.getItem "currentRegimen"
+      >>> map (_ >>= JSON.readJSON >>> hush)
+
   inst <-
     App.makeWithSelector
       (liftNat runSmartUnfitEffect `merge` never)
-      app
+      (app storedRegimen)
       "#app"
 
   inst.run

@@ -13,8 +13,10 @@
     "purescript-spork": "^1.0.0",
     "purescript-generics-rep": "^6.0.0",
     "purescript-routing": "^8.0.0",
-    "purescript-simple-json": "^4.1.0",
-    "purescript-css": "^4.0.0"
+    "purescript-simple-json": "^4.2.0",
+    "purescript-css": "^4.0.0",
+    "purescript-newtype": "^3.0.0",
+    "purescript-foreign": "^5.0.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^4.0.0"
