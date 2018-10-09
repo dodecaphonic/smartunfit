@@ -241,8 +241,10 @@ exerciseSummaryView ex =
         (AerobicExercise e) -> (show e.timeInMinutes) <> "'"
         (BodyWeightExercise e) ->
           case ex.technique of
-            (TimeHoldingPosture t) -> (show t) <> "\""
-            (RepetitionSequence seq) -> show seq
+            (TimeHoldingPosture t) -> show t
+            (RepetitionSequence seq) ->
+              S.joinWith "|" $
+                map (\w -> show w) (nubEq $ extractWeights ex.technique)
             _ -> ""
 
     muscleGroupClassName =
