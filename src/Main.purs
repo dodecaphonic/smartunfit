@@ -4,7 +4,7 @@ import Prelude
 
 import App.Styles (styleSheet)
 import App.Utils (groupBy, padLeft, seriesSeqToLabel)
-import Data.Array (foldl, length, nubEq, range, snoc, zip, (!!))
+import Data.Array (foldl, fromFoldable, length, nubEq, range, snoc, zip, (!!))
 import Data.Const (Const)
 import Data.Either (Either, hush)
 import Data.Foldable (oneOf)
@@ -13,6 +13,7 @@ import Data.Generic.Rep as G
 import Data.Generic.Rep.Show as GShow
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.String (Pattern(..), split)
 import Data.String as S
 import Data.Tuple (Tuple(..), uncurry)
 import Effect (Effect)
@@ -297,12 +298,11 @@ exerciseExtraInfoView :: Exercise -> H.Html Action
 exerciseExtraInfoView exercise =
   H.div
     []
-    [ H.text details
-    , H.br []
-    , H.text technique
-    , H.br []
-    , H.text (fromMaybe "" exercise.notes)
-    ]
+    ([ H.text details
+     , H.br []
+     , H.text technique
+     , H.br []
+     ] <> notes)
   where
     details =
       case exercise.details of
@@ -317,16 +317,23 @@ exerciseExtraInfoView exercise =
         StayAtIt ->
           ""
         (TimeHoldingPosture n) ->
-          "Segurar por " <> show n <> "\""
+          "Segurar por " <> show n
 
     repSequence =
-      map describeRep
+      fromFoldable <<< map describeRep
       where
         describeRep (Repetitions { count }) = show count
         describeRep (UnilateralRepetitions { count }) = show count <> " (Unilateral)"
         describeRep (RepetitionRange { minimum, maximum }) = show minimum <> "-" <> show maximum
         describeRep (MaxRepetitions _) = "Máximo"
-        describeRep (HoldPosture { howLong }) = "Segurar " <> show howLong <> "\""
+        describeRep (HoldPosture { howLong }) = "Segurar " <> show howLong
+
+    notes :: Array (H.Html Action)
+    notes =
+      F.intercalate ([H.br []]) $
+        fromMaybe [] $
+        map (map (pure <<< H.text)) $
+        map (split (Pattern "\n")) exercise.notes
 
 missingExerciseDetailsView :: H.Html Action
 missingExerciseDetailsView =

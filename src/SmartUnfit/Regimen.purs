@@ -4,34 +4,50 @@ import Prelude
 
 import Data.Array (catMaybes, find)
 import Data.Maybe (Maybe(..))
-import SmartUnfit.Exercises (EquipmentAdjustment(..), Exercise, ExerciseDetails(..), ExerciseTechnique(..), MuscleGroup(..), RepetitionStyle(..), Series, TimeInSeconds(..), Weight(..), defaultExercises)
+import SmartUnfit.Exercises ( EquipmentAdjustment(..)
+                            , Exercise
+                            , ExerciseDetails(..)
+                            , ExerciseTechnique(..)
+                            , MuscleGroup(..)
+                            , RepetitionStyle(..)
+                            , Series
+                            , TimeInSeconds(..)
+                            , Weight(..)
+                            , defaultExercises
+                            , mkRepetitionSequence
+                            )
 
 type Regimen = Array Series
 
 singleRep :: Number -> Int -> ExerciseTechnique
 singleRep weight count
-  = RepetitionSequence [ Repetitions { weight: Weight weight, count } ]
+  = mkRepetitionSequence
+      (Repetitions { weight: Weight weight, count })
+      []
 
 bodyWeightSingleRep :: Int -> ExerciseTechnique
 bodyWeightSingleRep count
-  = RepetitionSequence [ Repetitions { weight: BodyWeight, count } ]
+  = mkRepetitionSequence
+    (Repetitions { weight: BodyWeight, count })
+    []
 
 repRange :: Number -> Int -> Int -> ExerciseTechnique
 repRange weight minimum maximum
-  = RepetitionSequence
-      [ RepetitionRange { weight: Weight weight, minimum, maximum } ]
+  = mkRepetitionSequence
+      (RepetitionRange { weight: Weight weight, minimum, maximum })
+      []
 
 sequencedReps :: Number -> Int -> Int -> ExerciseTechnique
 sequencedReps weight a b
-  = RepetitionSequence
-      [ Repetitions { weight: Weight weight, count: a }
-      , Repetitions { weight: Weight weight, count: b } ]
+  = mkRepetitionSequence
+      (Repetitions { weight: Weight weight, count: a })
+      [ Repetitions { weight: Weight weight, count: b } ]
 
 timedRep :: Number -> Int -> ExerciseTechnique
 timedRep weight howLong
-  = RepetitionSequence
-      [ HoldPosture { weight: Weight weight, howLong: TimeInSeconds howLong }
-      ]
+  = mkRepetitionSequence
+      (HoldPosture { weight: Weight weight, howLong: TimeInSeconds howLong })
+      []
 
 adjustExercise :: String
                -> Array EquipmentAdjustment
@@ -66,9 +82,9 @@ seriesA =
                      (Just "Barra W na Polia\n2 tempos")
     , adjustExercise "Rosca Direta"
                      []
-                     ( RepetitionSequence
-                         [ HoldPosture { weight: Weight 22.5, howLong: TimeInSeconds 10 }
-                         , Repetitions { weight: Weight 22.5, count: 12 }
+                     ( mkRepetitionSequence
+                         (HoldPosture { weight: Weight 22.5, howLong: TimeInSeconds 10 })
+                         [ Repetitions { weight: Weight 22.5, count: 12 }
                          ]
                      )
                      (Just "Barra W na Polia")
@@ -76,9 +92,9 @@ seriesA =
                      [ NumericAdjustment { adjustment: 6, description: "Banco" }
                      , NumericAdjustment { adjustment: 0, description: "Amplitude" }
                      ]
-                     ( RepetitionSequence
-                         [ UnilateralRepetitions { weight: Weight 20.0, count: 8 }
-                         , Repetitions { weight: Weight 35.0, count: 10 }
+                     ( mkRepetitionSequence
+                         (UnilateralRepetitions { weight: Weight 20.0, count: 8 })
+                         [ Repetitions { weight: Weight 35.0, count: 10 }
                          ]
                      )
                      Nothing
@@ -90,9 +106,9 @@ seriesA =
            }
     , adjustExercise "Puxada Polia Barra"
                      []
-                     ( RepetitionSequence
-                         [ HoldPosture { weight: Weight 47.0, howLong: TimeInSeconds 3 }
-                         , Repetitions { weight: Weight 47.0, count: 8 }
+                     ( mkRepetitionSequence
+                         (HoldPosture { weight: Weight 47.0, howLong: TimeInSeconds 3 })
+                         [ Repetitions { weight: Weight 47.0, count: 8 }
                          ]
                      )
                      (Just "8x segurando 3\" entre reps, depois 8 normais\nBarra triangular")
@@ -104,13 +120,13 @@ seriesA =
                         }
            , muscleGroup: Biceps
            , notes: Just "Preparar antes de fazer Puxada Polia"
-           , technique: RepetitionSequence [ MaxRepetitions { weight: Weight 2.5 } ]
+           , technique: mkRepetitionSequence (MaxRepetitions { weight: Weight 2.5 }) []
            }
     , adjustExercise "Agachamento Smith"
                      []
-                     ( RepetitionSequence
-                         [ Repetitions { weight: Weight 2.5, count: 10 }
-                         , HoldPosture { weight: Weight 2.5, howLong: TimeInSeconds 5 }
+                     ( mkRepetitionSequence
+                         (Repetitions { weight: Weight 2.5, count: 10 })
+                         [ HoldPosture { weight: Weight 2.5, howLong: TimeInSeconds 5 }
                          ]
                      )
                      Nothing
@@ -134,15 +150,17 @@ seriesA =
            , details: BodyWeightExercise { place: "Step" }
            , muscleGroup: AbdomenLumbar
            , notes: Nothing
-           , technique: RepetitionSequence
-                          [ MaxRepetitions { weight: BodyWeight } ]
+           , technique: mkRepetitionSequence
+                          (MaxRepetitions { weight: BodyWeight })
+                          []
            }
     , Just { description: "Abdominal no Bosu com Anilha"
            , details: BodyWeightExercise { place: "Step" }
            , muscleGroup: AbdomenLumbar
            , notes: Nothing
-           , technique: RepetitionSequence
-                          [ MaxRepetitions { weight: Weight 5.0 } ]
+           , technique: mkRepetitionSequence
+                          (MaxRepetitions { weight: Weight 5.0 })
+                          []
            }
     , Just { description: "Aeróbico Livre (Transport)"
            , details: AerobicExercise { timeInMinutes: 15 }
@@ -164,25 +182,25 @@ seriesB =
     , adjustExercise "Supino Máquina"
                      [ NumericAdjustment { adjustment: 7, description: "Assento" }
                      , NumericAdjustment { adjustment: 2, description: "Braços" } ]
-                     ( RepetitionSequence
-                         [ Repetitions { weight: Weight 20.0, count: 8 }
-                         , MaxRepetitions { weight: Weight 30.0 }
+                     ( mkRepetitionSequence
+                         (Repetitions { weight: Weight 20.0, count: 8 })
+                         [ MaxRepetitions { weight: Weight 30.0 }
                          ]
                      )
                      (Just "Unilateral + Bilateral 2T")
     , adjustExercise "Mesa Flexora"
                      []
-                     ( RepetitionSequence
-                         [ Repetitions { weight: Weight 12.5, count: 10 }
-                         , MaxRepetitions { weight: Weight 20.0 }
+                     ( mkRepetitionSequence
+                         (Repetitions { weight: Weight 12.5, count: 10 })
+                         [ MaxRepetitions { weight: Weight 20.0 }
                          ]
                      )
                      (Just "Unilateral + Bilateral\nMovimento concentrado na descida")
     , adjustExercise "Tríceps Polia"
                      []
-                     ( RepetitionSequence
-                         [ Repetitions { weight: Weight 15.0, count: 8 }
-                         , Repetitions { weight: Weight 20.0, count: 8 }
+                     ( mkRepetitionSequence
+                         (Repetitions { weight: Weight 15.0, count: 8 })
+                         [ Repetitions { weight: Weight 20.0, count: 8 }
                          , Repetitions { weight: Weight 25.0, count: 8 }
                          , MaxRepetitions { weight: Weight 20.0 }
                          ]
@@ -196,9 +214,9 @@ seriesB =
            }
     , adjustExercise "Pullover"
                      []
-                     ( RepetitionSequence
-                         [ Repetitions { weight: Weight 7.5, count: 12 }
-                         , HoldPosture { weight: Weight 7.5, howLong: TimeInSeconds 10 }
+                     ( mkRepetitionSequence
+                         (Repetitions { weight: Weight 7.5, count: 12 })
+                         [ HoldPosture { weight: Weight 7.5, howLong: TimeInSeconds 10 }
                          ]
                      )
                      (Just "Crucifixo\nPolia Média (8)")

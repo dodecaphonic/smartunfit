@@ -6,6 +6,7 @@ module SmartUnfit.Exercises
        , EquipmentId
        , EquipmentAdjustment(..)
        , MuscleGroup(..)
+       , NonEmptyArray
        , RepetitionStyle(..)
        , Series
        , TrainingSession
@@ -13,17 +14,21 @@ module SmartUnfit.Exercises
        , Weight(..)
        , defaultExercises
        , extractWeights
+       , mkRepetitionSequence
        ) where
 
 import Prelude
 
 import Control.Alternative ((<|>))
 import Control.Monad.Except (throwError)
+import Data.Array (fromFoldable, head, length, tail)
 import Data.DateTime (DateTime)
+import Data.Foldable (class Foldable, foldMap, foldl, foldr)
 import Data.Generic.Rep as G
 import Data.Generic.Rep.Show as GShow
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
+import Data.NonEmpty (NonEmpty, (:|))
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 import Foreign (Foreign)
 import Foreign as Foreign
@@ -40,6 +45,20 @@ data MuscleGroup =
   | Shoulders
   | AbdomenLumbar
   | WholeBody
+
+newtype NonEmptyArray a = NonEmptyArray (NonEmpty Array a)
+derive instance newtypeNonEmptyArray :: Newtype (NonEmptyArray a) _
+derive instance functorNonEmptyArray :: Functor NonEmptyArray
+derive instance eqNonEmptyArray :: (Eq a) => Eq (NonEmptyArray a)
+derive instance genericNonEmptyArray :: G.Generic (NonEmptyArray a) _
+
+instance showNonEmptyArray :: (Show a) => Show (NonEmptyArray a) where
+  show = GShow.genericShow
+
+instance foldableNonEmptyArray :: Foldable NonEmptyArray where
+  foldMap f = foldMap f <<< unwrap
+  foldr f m = foldr f m <<< unwrap
+  foldl f m = foldl f m <<< unwrap
 
 derive instance eqMuscleGroup :: Eq MuscleGroup
 derive instance ordMuscleGroup :: Ord MuscleGroup
@@ -75,7 +94,7 @@ data RepetitionStyle =
    | HoldPosture { weight :: Weight, howLong :: TimeInSeconds}
 
 data ExerciseTechnique =
-    RepetitionSequence (Array RepetitionStyle)
+    RepetitionSequence (NonEmptyArray RepetitionStyle)
   | StayAtIt
   | TimeHoldingPosture TimeInSeconds
 
@@ -172,6 +191,30 @@ instance argumentEnumReadForeign ::
 
 instance noArgumentEnumReadForeign :: EnumReadForeign G.NoArguments where
   enumReadForeignImpl f = pure G.NoArguments
+
+instance writeForeignNonEmptyArray ::
+  (JSON.WriteForeign a) =>
+  JSON.WriteForeign (NonEmptyArray a) where
+  writeImpl (NonEmptyArray (a :| as))
+    = JSON.writeImpl $ [a] <> as
+
+instance readForeignNonEmptyArray ::
+  (JSON.ReadForeign a) =>
+  JSON.ReadForeign (NonEmptyArray a) where
+
+  readImpl value = do
+    as :: Array a <- JSON.readImpl value
+
+    if length as == 0
+      then throwError <<< pure <<< Foreign.ForeignError $ "Empty Array received in NonEmpty context"
+      else
+        let
+          mneas = (:|) <$> head as <*> tail as
+        in
+         case mneas of
+           Just neas -> pure (NonEmptyArray neas)
+           _ -> throwError <<< pure <<< Foreign.ForeignError $ "Error building NonEmptyArray"
+
 
 instance writeForeignRepetitionStyle ::
   JSON.WriteForeign RepetitionStyle where
@@ -300,7 +343,7 @@ mkWeightTrainingExercise muscleGroup equipmentId description =
     , description
     , details
     , notes: Nothing
-    , technique: RepetitionSequence [ Repetitions { weight: Weight 5.0, count: 1 } ]
+    , technique: mkRepetitionSequence (Repetitions { weight: Weight 5.0, count: 1 }) []
     }
 
 defaultExercises :: Array Exercise
@@ -358,9 +401,16 @@ defaultExercises =
   , mkWeightTrainingExercise AbdomenLumbar (Just 44) "Hiperextensão Lombar"
   ]
 
+mkRepetitionSequence
+  :: RepetitionStyle
+  -> Array RepetitionStyle
+  -> ExerciseTechnique
+mkRepetitionSequence firstRep remainingReps =
+  RepetitionSequence $ NonEmptyArray (firstRep :| remainingReps)
+
 extractWeights :: ExerciseTechnique -> Array Weight
 extractWeights (RepetitionSequence seq) =
-  map extractWeight seq
+  fromFoldable $ map extractWeight seq
   where
     extractWeight (Repetitions { weight }) = weight
     extractWeight (UnilateralRepetitions { weight }) = weight
