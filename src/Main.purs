@@ -21,7 +21,15 @@ import Routing (match)
 import Routing.Hash (hashes)
 import Routing.Match (Match, end, int, lit, root)
 import Simple.JSON as JSON
-import SmartUnfit.Exercises (EquipmentAdjustment(..), Exercise, ExerciseDetails(..), ExerciseTechnique(..), MuscleGroup(..), RepetitionStyle(..), Series, extractWeights)
+import SmartUnfit.Exercises ( EquipmentAdjustment(..)
+                            , Exercise
+                            , ExerciseDetails(..)
+                            , ExerciseTechnique(..)
+                            , MuscleGroup(..)
+                            , RepetitionStyle(..)
+                            , Series
+                            , extractWeights
+                            )
 import SmartUnfit.Regimen as Regimen
 import Spork.App as App
 import Spork.Html as H
@@ -238,14 +246,14 @@ exerciseSummaryView ex =
       case ex.details of
         (WeightTrainingExercise _) ->
           S.joinWith "|" $
-            map (\w -> show w) (nubEq $ extractWeights ex.technique)
-        (AerobicExercise e) -> (show e.timeInMinutes) <> "'"
-        (BodyWeightExercise e) ->
+            map show (nubEq $ extractWeights ex.technique)
+        (AerobicExercise { timeInMinutes }) -> (show timeInMinutes) <> "'"
+        (BodyWeightExercise _) ->
           case ex.technique of
             (TimeHoldingPosture t) -> show t
             (RepetitionSequence seq) ->
               S.joinWith "|" $
-                map (\w -> show w) (nubEq $ extractWeights ex.technique)
+                map show (nubEq $ extractWeights ex.technique)
             _ -> ""
 
     muscleGroupClassName =
