@@ -4,18 +4,7 @@ import Prelude
 
 import Data.Array (catMaybes, find)
 import Data.Maybe (Maybe(..))
-import SmartUnfit.Exercises ( EquipmentAdjustment(..)
-                            , Exercise
-                            , ExerciseDetails(..)
-                            , ExerciseTechnique(..)
-                            , MuscleGroup(..)
-                            , RepetitionStyle(..)
-                            , Series
-                            , TimeInSeconds(..)
-                            , Weight(..)
-                            , defaultExercises
-                            , mkRepetitionSequence
-                            )
+import SmartUnfit.Exercises (EquipmentAdjustment(..), Exercise, ExerciseDetails(..), ExerciseTechnique(..), MuscleGroup(..), RepetitionStyle(..), Series, TimeInSeconds(..), Weight(..), defaultExercises, mkRepetitionSequence)
 
 type Regimen = Array Series
 
@@ -71,96 +60,88 @@ seriesA :: Series
 seriesA =
   catMaybes $
     [ Just { description: "Aquecimento (Bike)"
-           , details: AerobicExercise { timeInMinutes: 15 }
+           , details: AerobicExercise { timeInMinutes: 10 }
            , muscleGroup: WholeBody
            , notes: Nothing
            , technique: StayAtIt
            }
-    , adjustExercise "Remada Alta"
-                     []
-                     ( singleRep 22.5 15 )
-                     (Just "Barra W na Polia\n2 tempos")
-    , adjustExercise "Rosca Direta"
-                     []
-                     ( mkRepetitionSequence
-                         (HoldPosture { weight: Weight 22.5, howLong: TimeInSeconds 10 })
-                         [ Repetitions { weight: Weight 22.5, count: 12 }
-                         ]
-                     )
-                     (Just "Barra W na Polia")
-    , adjustExercise "Crucifixo Invertido Máquina"
+    , adjustExercise "Remada Máquina"
                      [ NumericAdjustment { adjustment: 6, description: "Banco" }
-                     , NumericAdjustment { adjustment: 0, description: "Amplitude" }
+                     , NumericAdjustment { adjustment: 4, description: "Peito" }
                      ]
                      ( mkRepetitionSequence
-                         (UnilateralRepetitions { weight: Weight 20.0, count: 8 })
-                         [ Repetitions { weight: Weight 35.0, count: 10 }
+                         (UnilateralRepetitions { weight: Weight 27.5, count: 12 })
+                         [ Repetitions { weight: Weight 27.5, count: 12 }
                          ]
                      )
                      Nothing
-    , Just { description: "Sobe e Desce na Escada"
-           , details: AerobicExercise { timeInMinutes: 1 }
-           , muscleGroup: LowerLimbs
-           , notes: Nothing
-           , technique: StayAtIt
-           }
-    , adjustExercise "Puxada Polia Barra"
+    , adjustExercise "Agachamento Smith"
                      []
                      ( mkRepetitionSequence
-                         (HoldPosture { weight: Weight 47.0, howLong: TimeInSeconds 3 })
-                         [ Repetitions { weight: Weight 47.0, count: 8 }
+                         (UnilateralRepetitions { weight: Weight 7.5, count: 5 })
+                         [ Repetitions { weight: Weight 7.5, count: 10 }
                          ]
                      )
-                     (Just "8x segurando 3\" entre reps, depois 8 normais\nBarra triangular")
-    , Just { description: "Bíceps com Barra H"
+                     (Just "Afundo Unilateral + Bilateral")
+    , Just { description: "Rosca com rotação (Bíceps)"
            , details: WeightTrainingExercise
                         { equipmentId: Nothing
                         , equipmentAdjustments: []
                         , seriesCount: 3
                         }
            , muscleGroup: Biceps
-           , notes: Just "Preparar antes de fazer Puxada Polia"
-           , technique: mkRepetitionSequence (MaxRepetitions { weight: Weight 2.5 }) []
+           , notes: Just "Banco em 90°\n\n40\"\n\30\"\n20\""
+           , technique:
+               mkRepetitionSequence
+                 (MaxRepetitions { weight: Weight 9.0 })
+                 [ MaxRepetitions { weight: Weight 8.0 }
+                 , MaxRepetitions { weight: Weight 7.0 }
+                 , MaxRepetitions { weight: Weight 6.0 }
+                 ]
            }
-    , adjustExercise "Agachamento Smith"
-                     []
-                     ( mkRepetitionSequence
-                         (Repetitions { weight: Weight 2.5, count: 10 })
-                         [ HoldPosture { weight: Weight 2.5, howLong: TimeInSeconds 5 }
-                         ]
-                     )
-                     Nothing
-    , adjustExercise "Afundo"
-                     []
-                     ( singleRep 5.0 10 )
-                     (Just "Com anilha.\n2 tempos, alternando pernas")
-    , Just { description: "Panturrilha na Escada"
-           , details: BodyWeightExercise { place: "Escada" }
-           , muscleGroup: LowerLimbs
-           , notes: Just "Segurar 2\" na subida"
-           , technique: bodyWeightSingleRep 15
-           }
-    , Just { description: "Corrida no Bosu"
+    , Just { description: "Tiro na Bike"
            , details: AerobicExercise { timeInMinutes: 3 }
-           , muscleGroup: LowerLimbs
-           , notes: Just "Correr 30\", descansar 15\", repetir"
+           , muscleGroup: WholeBody
+           , notes: Nothing
            , technique: StayAtIt
            }
-    , Just { description: "Abdominal no Step"
+    , adjustExercise "Puxada Polia Barra Frente"
+           []
+           ( mkRepetitionSequence
+               (Repetitions { weight: Weight 26.0, count: 8 })
+               [ Repetitions { weight: Weight 33.0, count: 8 }
+               , Repetitions { weight: Weight 40.0, count: 8 }
+               , MaxRepetitions { weight: Weight 45.0 }
+               ]
+           )
+           (Just "Primeiras 3 pronadas, última supinada")
+    , adjustExercise "Leg Press 45"
+                     []
+                     ( mkRepetitionSequence
+                         (Repetitions { weight: Weight 30.0, count: 8 })
+                         [ Repetitions { weight: Weight 30.0, count: 8 }
+                         , Repetitions { weight: Weight 30.0, count: 12 }
+                         ]
+                     )
+                     (Just "8x segurando 3\" entre reps, depois 8 normais, depois panturrilha.")
+    , adjustExercise "Barra Fixa no Gravitron"
+                     []
+                     ( mkRepetitionSequence
+                         (MaxRepetitions { weight: Weight 42.5 })
+                         []
+                     )
+                     Nothing
+    , Just { description: "Subida Lateral Alternada no Step"
            , details: BodyWeightExercise { place: "Step" }
-           , muscleGroup: AbdomenLumbar
-           , notes: Nothing
-           , technique: mkRepetitionSequence
-                          (MaxRepetitions { weight: BodyWeight })
-                          []
+           , muscleGroup: LowerLimbs
+           , notes: Just "30\", 15\" de descanso entre reps"
+           , technique: StayAtIt
            }
-    , Just { description: "Abdominal no Bosu com Anilha"
-           , details: BodyWeightExercise { place: "Step" }
-           , muscleGroup: AbdomenLumbar
-           , notes: Nothing
-           , technique: mkRepetitionSequence
-                          (MaxRepetitions { weight: Weight 5.0 })
-                          []
+    , Just { description: "Abdominal"
+           , details: AerobicExercise { timeInMinutes: 3 }
+           , muscleGroup: LowerLimbs
+           , notes: Just "Supra 30\"\nPedalada 30\"\nOblíquo 30\"\nInfra Uni 30\"\n2' de transport intenso entre séries."
+           , technique: StayAtIt
            }
     , Just { description: "Aeróbico Livre (Transport)"
            , details: AerobicExercise { timeInMinutes: 15 }
@@ -179,79 +160,73 @@ seriesB =
            , notes: Nothing
            , technique: StayAtIt
            }
-    , adjustExercise "Supino Máquina"
-                     [ NumericAdjustment { adjustment: 7, description: "Assento" }
-                     , NumericAdjustment { adjustment: 2, description: "Braços" } ]
+    , adjustExercise "Supino Livre Inclinado"
+                     []
                      ( mkRepetitionSequence
-                         (Repetitions { weight: Weight 20.0, count: 8 })
-                         [ MaxRepetitions { weight: Weight 30.0 }
-                         ]
+                         (Repetitions { weight: Weight 7.5, count: 10 })
+                         []
                      )
                      (Just "Unilateral + Bilateral 2T")
-    , adjustExercise "Mesa Flexora"
+    , adjustExercise "Cadeira Abdutora"
                      []
                      ( mkRepetitionSequence
-                         (Repetitions { weight: Weight 12.5, count: 10 })
-                         [ MaxRepetitions { weight: Weight 20.0 }
-                         ]
+                         (Repetitions { weight: Weight 72.5, count: 10 })
+                         []
                      )
-                     (Just "Unilateral + Bilateral\nMovimento concentrado na descida")
-    , adjustExercise "Tríceps Polia"
-                     []
-                     ( mkRepetitionSequence
-                         (Repetitions { weight: Weight 15.0, count: 8 })
-                         [ Repetitions { weight: Weight 20.0, count: 8 }
-                         , Repetitions { weight: Weight 25.0, count: 8 }
-                         , MaxRepetitions { weight: Weight 20.0 }
-                         ]
-                     )
-                     (Just "Pronado + Supinado")
+                     (Just "5 5T + 10 normais")
+    , Just { description: "Tríceps Testa com HBM"
+           , details: WeightTrainingExercise
+                        { equipmentId: Nothing
+                        , equipmentAdjustments: []
+                        , seriesCount: 3
+                        }
+           , muscleGroup: Triceps
+           , notes: Just "Descer a 90° na testa"
+           , technique: singleRep 14.0 10
+           }
     , Just { description: "Tiro no Transport"
            , details: AerobicExercise { timeInMinutes: 3 }
            , muscleGroup: WholeBody
            , notes: Nothing
            , technique: StayAtIt
            }
-    , adjustExercise "Pullover"
+    , Just { description: "Flexão de Braço Alternada no Step"
+           , details: BodyWeightExercise { place: "Chão" }
+           , muscleGroup: Triceps
+           , notes: Nothing
+           , technique:
+               mkRepetitionSequence
+                 (MaxRepetitions { weight: BodyWeight })
+                 []
+           }
+    , adjustExercise "Elevação Frontal"
                      []
-                     ( mkRepetitionSequence
-                         (Repetitions { weight: Weight 7.5, count: 12 })
-                         [ HoldPosture { weight: Weight 7.5, howLong: TimeInSeconds 10 }
-                         ]
-                     )
-                     (Just "Crucifixo\nPolia Média (8)")
-    , adjustExercise "Cadeira Abdutora"
+                     ( singleRep 5.0 10 )
+                     (Just "Corda")
+    , adjustExercise "Cadeira Flexora"
                      []
                      ( singleRep 65.0 16 )
                      (Just "Primeiras 8 segurando 3\" entre repetições")
-    , adjustExercise "Elevação Frontal"
-                     []
-                     (singleRep 5.0 10)
-                     (Just "Alternado, HBC")
-    , adjustExercise "Elevação Lateral"
-                     []
-                     (singleRep 5.0 10)
-                     (Just "Simultâneo, HBC")
-    , Just { description: "Polichinelos"
-           , details: AerobicExercise { timeInMinutes: 3 }
-           , muscleGroup: WholeBody
-           , notes: Just "30\"/15\""
-           , technique: StayAtIt
+    , Just { description: "Prancha na Bola"
+           , details: BodyWeightExercise { place: "Bola de Pilates" }
+           , muscleGroup: AbdomenLumbar
+           , notes: Nothing
+           , technique: TimeHoldingPosture (TimeInSeconds 30)
            }
-    , Just { description: "Prancha Lateral"
+    , Just { description: "Super-Homem"
            , details: BodyWeightExercise { place: "Colchonete" }
            , muscleGroup: AbdomenLumbar
            , notes: Nothing
            , technique: TimeHoldingPosture (TimeInSeconds 15)
            }
-    , Just { description: "Perdigueiro"
-           , details: BodyWeightExercise { place: "Colchonete" }
+    , Just { description: "Prancha Lateral"
+           , details: BodyWeightExercise { place: "Bosu" }
            , muscleGroup: AbdomenLumbar
            , notes: Nothing
            , technique: TimeHoldingPosture (TimeInSeconds 15)
            }
     , Just { description: "Aeróbico Livre (Esteira HIIT)"
-           , details: AerobicExercise { timeInMinutes: 15 }
+           , details: AerobicExercise { timeInMinutes: 10 }
            , muscleGroup: WholeBody
            , notes: Nothing
            , technique: StayAtIt
